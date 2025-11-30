@@ -1,0 +1,32 @@
+[package]
+name = "zon-format"
+version = "1.0.5"
+edition = "2021"
+authors = ["ZON-FORMAT (Roni Bhakta)"]
+description = "Zero Overhead Notation (ZON) - A compact, human-readable data serialization format optimized for LLM token efficiency"
+license = "MIT"
+repository = "https://github.com/ZON-Format/ZON-RS"
+homepage = "https://github.com/ZON-Format/ZON-RS"
+documentation = "https://docs.rs/zon-format"
+readme = "README.md"
+keywords = ["zon", "json", "serialization", "llm", "token-efficient"]
+categories = ["encoding", "parser-implementations", "data-structures"]
+
+[lib]
+name = "zon_format"
+path = "src/lib.rs"
+
+[[bin]]
+name = "zon"
+path = "src/bin/zon.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["preserve_order"] }
+thiserror = "2.0"
+indexmap = { version = "2.6", features = ["serde"] }
+regex = "1.11"
+once_cell = "1.20"
+
+[dev-dependencies]
+pretty_assertions = "1.4"
