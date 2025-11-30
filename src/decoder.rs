@@ -10,7 +10,21 @@ use crate::constants::{
 };
 use crate::error::{ZonDecodeError, ZonDecodeErrorDetails, ZonResult};
 use indexmap::IndexMap;
+use once_cell::sync::Lazy;
+use regex::Regex;
 use serde_json::{json, Map, Value};
+
+// Lazy static regex patterns for performance
+static V2_NAMED_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^@(\w+)\((\d+)\)(\[\w+\])*:(.+)$").unwrap());
+static V2_VALUE_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^@\((\d+)\)(\[\w+\])*:(.+)$").unwrap());
+static V2_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^@(\d+)(\[\w+\])*:(.+)$").unwrap());
+static V1_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^@(\w+)\((\d+)\):(.+)$").unwrap());
+static OMITTED_COLS_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\[(\w+)\]").unwrap());
 
 /// Decode options
 #[derive(Debug, Clone)]
@@ -266,8 +280,7 @@ impl ZonDecoder {
     /// Parse table header line
     fn parse_table_header(&self, line: &str) -> ZonResult<(String, TableInfo)> {
         // Try v2.0 format with name: @name(count)[col][col]:columns
-        let v2_named_pattern = regex::Regex::new(r"^@(\w+)\((\d+)\)(\[\w+\])*:(.+)$").unwrap();
-        if let Some(caps) = v2_named_pattern.captures(line) {
+        if let Some(caps) = V2_NAMED_PATTERN.captures(line) {
             let table_name = caps.get(1).unwrap().as_str().to_string();
             let count: usize = caps.get(2).unwrap().as_str().parse().unwrap();
             let omitted_str = caps.get(3).map(|m| m.as_str()).unwrap_or("");
@@ -289,8 +302,7 @@ impl ZonDecoder {
         }
 
         // Try v2.1 format (anonymous/value): @(count)[col]:columns
-        let v2_value_pattern = regex::Regex::new(r"^@\((\d+)\)(\[\w+\])*:(.+)$").unwrap();
-        if let Some(caps) = v2_value_pattern.captures(line) {
+        if let Some(caps) = V2_VALUE_PATTERN.captures(line) {
             let count: usize = caps.get(1).unwrap().as_str().parse().unwrap();
             let omitted_str = caps.get(2).map(|m| m.as_str()).unwrap_or("");
             let cols_str = caps.get(3).unwrap().as_str();
@@ -311,8 +323,7 @@ impl ZonDecoder {
         }
 
         // Try v2.0 format (anonymous): @count[col][col]:columns
-        let v2_pattern = regex::Regex::new(r"^@(\d+)(\[\w+\])*:(.+)$").unwrap();
-        if let Some(caps) = v2_pattern.captures(line) {
+        if let Some(caps) = V2_PATTERN.captures(line) {
             let count: usize = caps.get(1).unwrap().as_str().parse().unwrap();
             let omitted_str = caps.get(2).map(|m| m.as_str()).unwrap_or("");
             let cols_str = caps.get(3).unwrap().as_str();
@@ -333,8 +344,7 @@ impl ZonDecoder {
         }
 
         // Fallback to v1.x format: @tablename(count):cols
-        let v1_pattern = regex::Regex::new(r"^@(\w+)\((\d+)\):(.+)$").unwrap();
-        if let Some(caps) = v1_pattern.captures(line) {
+        if let Some(caps) = V1_PATTERN.captures(line) {
             let table_name = caps.get(1).unwrap().as_str().to_string();
             let count: usize = caps.get(2).unwrap().as_str().parse().unwrap();
             let cols_str = caps.get(3).unwrap().as_str();
@@ -357,8 +367,8 @@ impl ZonDecoder {
     }
 
     fn parse_omitted_cols(&self, s: &str) -> Vec<String> {
-        let re = regex::Regex::new(r"\[(\w+)\]").unwrap();
-        re.captures_iter(s)
+        OMITTED_COLS_PATTERN
+            .captures_iter(s)
             .map(|cap| cap.get(1).unwrap().as_str().to_string())
             .collect()
     }
